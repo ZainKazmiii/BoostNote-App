@@ -128,6 +128,113 @@ interface MarkdownViewProps {
   showLinkOpenWarning?: boolean
 }
 
+interface ExternalEmbedSpec {
+  src: string
+  title: string
+  minHeight: number
+  allowFullScreen?: boolean
+}
+
+function getSingleLinkText(children: any): string | null {
+  if (typeof children === 'string') {
+    return children.trim()
+  }
+
+  if (Array.isArray(children)) {
+    const textChildren = children.filter((child) => typeof child === 'string')
+    if (textChildren.length === 1) {
+      return textChildren[0].trim()
+    }
+  }
+
+  return null
+}
+
+function getExternalEmbedSpec(
+  href: string | undefined,
+  children: any
+): ExternalEmbedSpec | null {
+  if (href == null || href.length === 0) {
+    return null
+  }
+
+  const singleLinkText = getSingleLinkText(children)
+  if (singleLinkText == null || singleLinkText !== href.trim()) {
+    return null
+  }
+
+  try {
+    const parsed = new URL(href)
+    const host = parsed.hostname.toLowerCase()
+
+    if (host === 'youtu.be') {
+      const id = parsed.pathname.split('/').filter(Boolean)[0]
+      if (id != null && id.length > 0) {
+        return {
+          src: `https://www.youtube.com/embed/${id}`,
+          title: 'YouTube embed',
+          minHeight: 360,
+          allowFullScreen: true,
+        }
+      }
+    }
+
+    if (
+      host === 'youtube.com' ||
+      host === 'www.youtube.com' ||
+      host === 'm.youtube.com'
+    ) {
+      const watchId = parsed.searchParams.get('v')
+      const embedId = parsed.pathname.startsWith('/embed/')
+        ? parsed.pathname.replace('/embed/', '').split('/')[0]
+        : null
+      const id = watchId || embedId
+      if (id != null && id.length > 0) {
+        return {
+          src: `https://www.youtube.com/embed/${id}`,
+          title: 'YouTube embed',
+          minHeight: 360,
+          allowFullScreen: true,
+        }
+      }
+    }
+
+    if (
+      host === 'twitter.com' ||
+      host === 'www.twitter.com' ||
+      host === 'x.com' ||
+      host === 'www.x.com'
+    ) {
+      const statusPath = parsed.pathname.match(/\/status\/(\d+)/)
+      if (statusPath != null) {
+        const statusUrl = `https://twitter.com/i/web/status/${statusPath[1]}`
+        return {
+          src: `https://twitframe.com/show?url=${encodeURIComponent(statusUrl)}`,
+          title: 'Tweet embed',
+          minHeight: 320,
+        }
+      }
+    }
+
+    if (host === 'gist.github.com' || host === 'www.gist.github.com') {
+      const parts = parsed.pathname.split('/').filter(Boolean)
+      if (parts.length >= 2) {
+        const user = parts[0]
+        const gistId = parts[1]
+        return {
+          src: `https://gist.github.com/${user}/${gistId}.pibb`,
+          title: 'Gist embed',
+          minHeight: 280,
+        }
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
+}
+
 const MarkdownView = ({
   content,
   updateContent,
@@ -203,6 +310,25 @@ const MarkdownView = ({
           return <ExpandableImage src={src} />
         },
         a: ({ href, children }: any) => {
+          const externalEmbedSpec = getExternalEmbedSpec(href, children)
+          if (externalEmbedSpec != null) {
+            return (
+              <span className='external-embed'>
+                <iframe
+                  src={externalEmbedSpec.src}
+                  title={externalEmbedSpec.title}
+                  loading='lazy'
+                  style={{
+                    width: '100%',
+                    minHeight: `${externalEmbedSpec.minHeight}px`,
+                    border: 0,
+                  }}
+                  allowFullScreen={externalEmbedSpec.allowFullScreen}
+                />
+              </span>
+            )
+          }
+
           if (agentType === 'ios-native' || agentType === 'android-native') {
             return (
               <a
@@ -510,6 +636,11 @@ const MarkdownView = ({
 
       .comment__count__number {
         line-height: 1;
+      }
+
+      .external-embed {
+        display: block;
+        margin: ${({ theme }) => theme.sizes.spaces.md}px 0;
       }
     `
   }, [previewStyle])
