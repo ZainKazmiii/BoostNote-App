@@ -77,6 +77,7 @@ import throttle from 'lodash.throttle'
 import { useI18n } from '../../lib/hooks/useI18n'
 import { lngKeys } from '../../lib/i18n/types'
 import { parse } from 'querystring'
+import { format } from 'date-fns'
 import DocShare from '../DocPage/DocShare'
 import EditorLayout from '../DocPage/EditorLayout'
 import PreferencesContextMenuWrapper from '../PreferencesContextMenuWrapper'
@@ -134,6 +135,14 @@ interface SelectionState {
 let cursorState: EditorPosition = {
   ch: 0,
   line: 0,
+}
+
+const insertCurrentDate = (cm: CodeMirror.Editor) => {
+  cm.replaceSelection(format(new Date(), 'yyyy-MM-dd'))
+}
+
+const insertCurrentDateTime = (cm: CodeMirror.Editor) => {
+  cm.replaceSelection(format(new Date(), 'yyyy-MM-dd HH:mm'))
 }
 
 const Editor = ({
@@ -269,6 +278,10 @@ const Editor = ({
         Enter: 'newlineAndIndentContinueMarkdownList',
         Tab: 'indentMore',
         'Ctrl-Space': 'autocomplete',
+        'Ctrl-/': insertCurrentDate,
+        'Cmd-/': insertCurrentDate,
+        'Ctrl-Shift-/': insertCurrentDateTime,
+        'Cmd-Shift-/': insertCurrentDateTime,
       },
       scrollPastEnd: true,
       // fixes IME being on top of current line, Codemirror issue: https://github.com/codemirror/CodeMirror/issues/3137
